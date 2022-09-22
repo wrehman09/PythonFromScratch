@@ -17,3 +17,20 @@ def hello(name):
     print("hello "+name)
 
 hello("wasi")
+
+
+#arguments 
+
+
+def argument(*args):
+    for n in args:
+        print(n)
+
+
+argument(3,4,5,6,7)
+
+def kargs(**kwargs):
+    print(kwargs["c"])
+    
+
+kargs(a=2,b=3,c=4)
