@@ -1,4 +1,4 @@
-#Monday Motivation Project
+#Sending Email with Python 
 import smtplib
 import datetime as dt
 import random
