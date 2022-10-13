@@ -27,3 +27,4 @@ Day22: Heart from turtle <br>
 Day23: web scraping with beautiful soap<br>
 Day24: Selenium <br>
 Day25: Beginner web development with FLASK <br>
+Day26: Tree Data Structure (Insertion and traversal) <br>
