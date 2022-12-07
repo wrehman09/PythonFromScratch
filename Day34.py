@@ -1,4 +1,4 @@
-# tree  removal 
+# tree   
 
 
 
@@ -60,7 +60,9 @@ class Tree():
         
         if(node.left!=None):
             self.intraverse(node.left)
-        print(node.value)
+        #print(node.value)
+        bf=self.getBalancedFactor(node)
+        print(f"node value: {node.value} balance factor:{bf} height:{self.getHeight(node)}")
         if(node.right!=None):
             self.intraverse(node.right)  
             
@@ -164,8 +166,7 @@ class Tree():
 
 
 
-    def  balance(self):
-        print("Balance")
+    
 
     def getHeight(self,root):
         leftht=0
@@ -176,6 +177,73 @@ class Tree():
             rightht=self.getHeight(root.right)+1
 
         return max(leftht,rightht)
+
+    def getBalancedFactor(self,root):
+        lftht=self.getHeight(root.left)+1 if root.left!=None  else 0
+        rghtht=self.getHeight(root.right)+1 if root.right!=None else 0
+        return lftht-rghtht
+
+    def rightRotate(self,node,parentNode):
+        
+        parentNode.left=node.left
+        node.left.right=node
+        node.left=None
+
+    def leftRotate(self,node,parentNode):
+        parentNode.right=node.right
+        node.right.left=node
+        node.right=None
+
+
+    def balanced(self):
+        node=self.root
+        bf=self.getBalancedFactor(node)  
+        parentNode=None  
+        while( (bf<=1 or bf>=-1) and  node.left!=None):
+            parentNode=node
+            node=node.right
+            bf=self.getBalancedFactor(node)
+
+        print(f"loop break for node{node.value}") 
+        self.leftRotate(node,parentNode)   
+
+
+
+
+
+
+    def insertionBalanced(self,val):
+        
+        if(self.root.value==None):
+            self.root.value=val
+            self.length+=1
+            print("root inserted")
+        else:
+            node=self.root
+            while(True):
+                if(node.value<val):
+                    if(node.right!=None):
+                        node=node.right
+                        
+                    else:
+                        node.right=Node()
+                        node.right.value=val
+                        self.length+=1
+                       
+                        break
+                else:
+                    if(node.left!=None):
+                        node=node.left
+                        
+                    else:
+                        node.left=Node()
+                        node.left.value=val
+                        self.length+=1
+                        
+                        break
+        
+        
+        
 
 
         
@@ -247,7 +315,7 @@ tr.remove(54)
 
 
 
-tr.preordertraverse()
+tr.inordertraverse()
 
 #tr.preordertraverse()
 print(f"element in tree:{tr.length}")
@@ -256,6 +324,5 @@ print(f"height: {tr.getHeight(tr.root)}")
                 
            
                 
-        
-
-        
+tr.balanced()        
+tr.inordertraverse()                                                                                                                                                                                  

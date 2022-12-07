@@ -33,3 +33,7 @@ Day28: Post request with flask and html form <br>
 Day29: Leet code challenge for add 2 number <br>
 Day30: Leet code challenge to find longest string<br>
 Day31: SqlLite Database crud 
+Day32: Tree Removel
+Day33: Check is palindrome without converting into string 
+Day34: Tree self Balancing 
+Day35: Graph 
