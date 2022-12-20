@@ -32,8 +32,9 @@ Day27: Dynamic Html pages in flask using jinja<br>
 Day28: Post request with flask and html form <br>
 Day29: Leet code challenge for add 2 number <br>
 Day30: Leet code challenge to find longest string<br>
-Day31: SqlLite Database crud 
-Day32: Tree Removel
-Day33: Check is palindrome without converting into string 
-Day34: Tree self Balancing 
-Day35: Graph 
+Day31: SqlLite Database crud <br>
+Day32: Tree Removel<br>
+Day33: Check is palindrome without converting into string <br>
+Day34: Tree self Balancing <br>
+Day35: Graph <br>
+Day36: Fibonacci and factorial iterative and recursive <br>
