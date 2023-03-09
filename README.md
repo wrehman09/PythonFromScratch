@@ -2,7 +2,7 @@
 Practicising Python from scratch daily 
 
 
-Day1:  Taling Input & print , conversion , if condition , functions and for loop <br>
+Day1:  Taking Input & print , conversion , if condition , functions and for loop <br>
 Day2:  Regex , reverse of string , ip valid <br>
 Day3:  random module , functions , arguments kwargs<br>
 Day4:  list <br>
