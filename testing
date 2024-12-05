@@ -1,96 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FEMA Disaster Declarations</title>
-  <style>
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    table, th, td {
-      border: 1px solid black;
-    }
-    th, td {
-      padding: 8px;
-      text-align: left;
-    }
-    th {
-      background-color: #f2f2f2;
-    }
-  </style>
-</head>
-<body>
-  <h1>FEMA Disaster Declarations</h1>
-  <div id="table-container">
-    <p>Loading data...</p>
-  </div>
+ stateLayer.addListener('mouseover', function (event) {
+                const stateName = event.feature.getProperty('name');
+                tooltip.setContent(stateName);
+                tooltip.setPosition(event.latLng);
+                tooltip.open(map);
+            });
 
-  <script>
-    async function fetchAndDisplayData() {
-      const url = "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq 'NE' and fipsCountyCode eq '075'";
-      const tableContainer = document.getElementById('table-container');
+            stateLayer.addListener('mouseout', function () {
+                tooltip.close();
+            });
 
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Network response was not ok');
 
-        const data = await response.json();
-        const records = data.DisasterDeclarationsSummaries;
+ tooltip = new google.maps.InfoWindow();
 
-        if (records.length === 0) {
-          tableContainer.innerHTML = "<p>No data found for the specified criteria.</p>";
-          return;
-        }
-
-        // Generate HTML table
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        const tbody = document.createElement('tbody');
-
-        // Define columns
-        const columns = ['Disaster Number', 'Declaration Title', 'Declaration Date', 'Incident Type', 'County'];
-
-        // Create table header
-        const headerRow = document.createElement('tr');
-        columns.forEach(col => {
-          const th = document.createElement('th');
-          th.textContent = col;
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-
-        // Create table rows
-        records.forEach(record => {
-          const row = document.createElement('tr');
-
-          // Populate columns with data
-          const disasterNumber = record.disasterNumber || 'N/A';
-          const title = record.declarationTitle || 'N/A';
-          const date = record.declarationDate || 'N/A';
-          const type = record.incidentType || 'N/A';
-          const county = record.designatedArea || 'N/A';
-
-          [disasterNumber, title, date, type, county].forEach(cellData => {
-            const td = document.createElement('td');
-            td.textContent = cellData;
-            row.appendChild(td);
-          });
-
-          tbody.appendChild(row);
-        });
-
-        table.appendChild(thead);
-        table.appendChild(tbody);
-        tableContainer.innerHTML = ''; // Clear loading message
-        tableContainer.appendChild(table);
-      } catch (error) {
-        tableContainer.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
-      }
-    }
-
-    fetchAndDisplayData();
-  </script>
-</body>
-</html>
