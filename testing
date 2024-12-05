@@ -1,223 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>States and Counties on Google Maps</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAHnxJaKR_J90atrYEGmdGCeHDS4qki2OM"></script>
-    <style>
-        #map {
-            height: 80vh; /* Reduced height for dropdown */
-            width: 100%;
-        }
-        #controls {
-            display: flex;
-            justify-content: center;
-            margin: 10px;
-        }
-        select {
-            margin: 0 10px;
-            padding: 5px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FEMA Disaster Declarations</title>
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table, th, td {
+      border: 1px solid black;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+  </style>
 </head>
 <body>
-    <div id="controls">
-        <select id="stateSelect">
-            <option value="" disabled selected>Select a State</option>
-        </select>
-        <select id="countySelect">
-            <option value="" disabled selected>Select a County</option>
-        </select>
-        <button id="fetchData">Fetch FEMA Data</button>
-    </div>
-    <div id="map"></div>
-    <script>
-        let map;
-        let stateLayer; // Data layer for states
-        let countyLayer; // Data layer for counties
-        let stateData = {}; // Store state name and abbreviation
-        let countyData = []; // Store counties for the selected state
+  <h1>FEMA Disaster Declarations</h1>
+  <div id="table-container">
+    <p>Loading data...</p>
+  </div>
 
-        function initMap() {
-            // Initialize the map centered on the United States
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: 37.0902, lng: -95.7129 }, // Center of the USA
-                zoom: 4,
-            });
+  <script>
+    async function fetchAndDisplayData() {
+      const url = "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq 'NE' and fipsCountyCode eq '075'";
+      const tableContainer = document.getElementById('table-container');
 
-            // Load the GeoJSON for states
-            stateLayer = new google.maps.Data();
-            stateLayer.loadGeoJson(
-                'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
-                null,
-                function (features) {
-                    populateStateDropdown(features);
-                }
-            );
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
 
-            // Style for states
-            stateLayer.setStyle({
-                fillColor: 'lightblue',
-                strokeColor: 'blue',
-                strokeWeight: 1,
-                fillOpacity: 0.6,
-            });
+        const data = await response.json();
+        const records = data.DisasterDeclarationsSummaries;
 
-            // Add states layer to map
-            stateLayer.setMap(map);
-
-            // Add click event listener for states
-            stateLayer.addListener('click', function (event) {
-                const stateid = event.feature.Hg;
-                const stateName = event.feature.getProperty('name');
-                loadCounties(stateName, stateid);
-
-                const geometry = event.feature.getGeometry();
-                fitBoundsToFeature(geometry);
-                stateLayer.setMap(null);
-            });
-
-            // Dropdown event listeners
-            document.getElementById('stateSelect').addEventListener('change', (event) => {
-                const stateName = event.target.value;
-                const stateid = stateData[stateName];
-                loadCounties(stateName, stateid);
-            });
-
-            document.getElementById('fetchData').addEventListener('click', () => {
-                const stateSelect = document.getElementById('stateSelect');
-                const countySelect = document.getElementById('countySelect');
-                const stateName = stateSelect.value;
-                const countyName = countySelect.value;
-
-                if (stateName && countyName) {
-                    fetchFemaData(stateName, countyName);
-                } else {
-                    alert('Please select both a state and a county.');
-                }
-            });
+        if (records.length === 0) {
+          tableContainer.innerHTML = "<p>No data found for the specified criteria.</p>";
+          return;
         }
 
-        function populateStateDropdown(features) {
-            const stateSelect = document.getElementById('stateSelect');
-            features.forEach((feature) => {
-                const stateName = feature.getProperty('name');
-                const stateid = feature.Hg;
-                stateData[stateName] = stateid;
+        // Generate HTML table
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
 
-                const option = document.createElement('option');
-                option.value = stateName;
-                option.textContent = stateName;
-                stateSelect.appendChild(option);
-            });
-        }
+        // Define columns
+        const columns = ['Disaster Number', 'Declaration Title', 'Declaration Date', 'Incident Type', 'County'];
 
-        function loadCounties(stateName, stateid) {
-            // Clear existing county data if present
-            if (countyLayer) {
-                countyLayer.setMap(null);
-            }
+        // Create table header
+        const headerRow = document.createElement('tr');
+        columns.forEach(col => {
+          const th = document.createElement('th');
+          th.textContent = col;
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
 
-            // Initialize a new data layer for counties
-            countyLayer = new google.maps.Data();
+        // Create table rows
+        records.forEach(record => {
+          const row = document.createElement('tr');
 
-            // Load GeoJSON for counties
-            countyLayer.loadGeoJson(
-                'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json',
-                null,
-                function () {
-                    populateCountyDropdown(stateid);
-                }
-            );
+          // Populate columns with data
+          const disasterNumber = record.disasterNumber || 'N/A';
+          const title = record.declarationTitle || 'N/A';
+          const date = record.declarationDate || 'N/A';
+          const type = record.incidentType || 'N/A';
+          const county = record.designatedArea || 'N/A';
 
-            // Filter counties by the selected state abbreviation
-            countyLayer.setStyle(function (feature) {
-                const countyStateAbbr = feature.getProperty('STATE'); // Replace with the actual property in your county GeoJSON
-                if (countyStateAbbr === stateid) {
-                    return {
-                        fillColor: 'green',
-                        strokeColor: 'black',
-                        strokeWeight: 1,
-                        fillOpacity: 0.6,
-                    };
-                }
-                return { visible: false }; // Hide counties not in the selected state
-            });
+          [disasterNumber, title, date, type, county].forEach(cellData => {
+            const td = document.createElement('td');
+            td.textContent = cellData;
+            row.appendChild(td);
+          });
 
-            // Add county layer to the map
-            countyLayer.setMap(map);
+          tbody.appendChild(row);
+        });
 
-            // Add click listener for counties
-            countyLayer.addListener('click', function (event) {
-                const countyName = event.feature.getProperty('NAME'); // Replace 'NAME' with the correct property for county name
-                fetchFemaData(stateName, countyName);
-            });
-        }
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableContainer.innerHTML = ''; // Clear loading message
+        tableContainer.appendChild(table);
+      } catch (error) {
+        tableContainer.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      }
+    }
 
-        function populateCountyDropdown(stateid) {
-            const countySelect = document.getElementById('countySelect');
-            countySelect.innerHTML = '<option value="" disabled selected>Select a County</option>';
-
-            countyLayer.forEach((feature) => {
-                const countyStateAbbr = feature.getProperty('STATE');
-                if (countyStateAbbr === stateid) {
-                    const countyName = feature.getProperty('NAME');
-                    countyData.push(countyName);
-
-                    const option = document.createElement('option');
-                    option.value = countyName;
-                    option.textContent = countyName;
-                    countySelect.appendChild(option);
-                }
-            });
-        }
-
-        function fetchFemaData(stateName, countyName) {
-            // Replace spaces with '%20' for URL encoding
-            const encodedState = encodeURIComponent(stateName);
-            const encodedCounty = encodeURIComponent(countyName);
-
-            // FEMA API URL for incidents by state and county
-            const apiUrl = `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq '${encodedState}' and designatedArea eq '${encodedCounty}'`;
-
-            // Fetch data from FEMA API
-            fetch(apiUrl)
-                .then(response => response.json())
-                .then(data => {
-                    // Display incident count and details
-                    const incidents = data.DisasterDeclarationsSummaries || [];
-                    const incidentCount = incidents.length;
-                    alert(`FEMA Incident Count for ${countyName}, ${stateName}: ${incidentCount}`);
-                })
-                .catch(error => {
-                    console.error('Error fetching FEMA data:', error);
-                    alert('Failed to fetch FEMA data.');
-                });
-        }
-
-        function fitBoundsToFeature(geometry) {
-            const bounds = new google.maps.LatLngBounds();
-
-            if (geometry.getType() === 'Polygon') {
-                geometry.getArray().forEach(function (path) {
-                    path.getArray().forEach(function (latLng) {
-                        bounds.extend(latLng);
-                    });
-                });
-            } else if (geometry.getType() === 'MultiPolygon') {
-                geometry.getArray().forEach(function (polygon) {
-                    polygon.getArray().forEach(function (path) {
-                        path.getArray().forEach(function (latLng) {
-                            bounds.extend(latLng);
-                        });
-                    });
-                });
-            }
-
-            map.fitBounds(bounds); // Adjust the map to fit the feature's bounds
-        }
-
-        // Initialize the map
-        window.onload = initMap;
-    </script>
+    fetchAndDisplayData();
+  </script>
 </body>
 </html>
