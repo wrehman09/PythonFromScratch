@@ -5,86 +5,37 @@
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAHnxJaKR_J90atrYEGmdGCeHDS4qki2OM"></script>
     <style>
         #map {
-            height: 100vh; /* Full screen height */
+            height: 80vh; /* Reduced height for dropdown */
             width: 100%;
+        }
+        #controls {
+            display: flex;
+            justify-content: center;
+            margin: 10px;
+        }
+        select {
+            margin: 0 10px;
+            padding: 5px;
         }
     </style>
 </head>
 <body>
+    <div id="controls">
+        <select id="stateSelect">
+            <option value="" disabled selected>Select a State</option>
+        </select>
+        <select id="countySelect">
+            <option value="" disabled selected>Select a County</option>
+        </select>
+        <button id="fetchData">Fetch FEMA Data</button>
+    </div>
     <div id="map"></div>
-	<script>
-	newobj={
-    "Alabama": "AL",
-    "Alaska": "AK",
-    "American Samoa": "AS",
-    "Arizona": "AZ",
-    "Arkansas": "AR",
-    "California": "CA",
-    "Colorado": "CO",
-    "Connecticut": "CT",
-    "Delaware": "DE",
-    "District Of Columbia": "DC",
-    "Federated States Of Micronesia": "FM",
-    "Florida": "FL",
-    "Georgia": "GA",
-    "Guam": "GU",
-    "Hawaii": "HI",
-    "Idaho": "ID",
-    "Illinois": "IL",
-    "Indiana": "IN",
-    "Iowa": "IA",
-    "Kansas": "KS",
-    "Kentucky": "KY",
-    "Louisiana": "LA",
-    "Maine": "ME",
-    "Marshall Islands": "MH",
-    "Maryland": "MD",
-    "Massachusetts": "MA",
-    "Michigan": "MI",
-    "Minnesota": "MN",
-    "Mississippi": "MS",
-    "Missouri": "MO",
-    "Montana": "MT",
-    "Nebraska": "NE",
-    "Nevada": "NV",
-    "New Hampshire": "NH",
-    "New Jersey": "NJ",
-    "New Mexico": "NM",
-    "New York": "NY",
-    "North Carolina": "NC",
-    "North Dakota": "ND",
-    "Northern Mariana Islands": "MP",
-    "Ohio": "OH",
-    "Oklahoma": "OK",
-    "Oregon": "OR",
-    "Palau": "PW",
-    "Pennsylvania": "PA",
-    "Puerto Rico": "PR",
-    "Rhode Island": "RI",
-    "South Carolina": "SC",
-    "South Dakota": "SD",
-    "Tennessee": "TN",
-    "Texas": "TX",
-    "Utah": "UT",
-    "Vermont": "VT",
-    "Virgin Islands": "VI",
-    "Virginia": "VA",
-    "Washington": "WA",
-    "West Virginia": "WV",
-    "Wisconsin": "WI",
-    "Wyoming": "WY"
-}
-	</script>
-	
-	
-	
-	
-	
-	
     <script>
         let map;
         let stateLayer; // Data layer for states
         let countyLayer; // Data layer for counties
+        let stateData = {}; // Store state name and abbreviation
+        let countyData = []; // Store counties for the selected state
 
         function initMap() {
             // Initialize the map centered on the United States
@@ -96,7 +47,11 @@
             // Load the GeoJSON for states
             stateLayer = new google.maps.Data();
             stateLayer.loadGeoJson(
-                'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
+                'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
+                null,
+                function (features) {
+                    populateStateDropdown(features);
+                }
             );
 
             // Style for states
@@ -112,40 +67,51 @@
 
             // Add click event listener for states
             stateLayer.addListener('click', function (event) {
-                const stateid=event.feature.Hg;
-				const stateName = event.feature.getProperty('name');
-                alert(`You clicked on ${stateName}`);
-
-                // Load counties for the clicked state
-                loadCounties(stateName,stateid);
+                const stateid = event.feature.Hg;
+                const stateName = event.feature.getProperty('name');
+                loadCounties(stateName, stateid);
 
                 const geometry = event.feature.getGeometry();
+                fitBoundsToFeature(geometry);
+                stateLayer.setMap(null);
+            });
 
-                // Change map center to the clicked county
-                if (geometry.getType() === 'Polygon') {
-                    const bounds = new google.maps.LatLngBounds();
-                    geometry.getArray().forEach(function (path) {
-                        path.getArray().forEach(function (latLng) {
-                            bounds.extend(latLng);
-                        });
-                    });
-                    map.fitBounds(bounds); // Adjust the map to fit the county's bounds
-                } else if (geometry.getType() === 'MultiPolygon') {
-                    const bounds = new google.maps.LatLngBounds();
-                    geometry.getArray().forEach(function (polygon) {
-                        polygon.getArray().forEach(function (path) {
-                            path.getArray().forEach(function (latLng) {
-                                bounds.extend(latLng);
-                            });
-                        });
-                    });
-                    map.fitBounds(bounds); // Adjust the map to fit the county's bounds
+            // Dropdown event listeners
+            document.getElementById('stateSelect').addEventListener('change', (event) => {
+                const stateName = event.target.value;
+                const stateid = stateData[stateName];
+                loadCounties(stateName, stateid);
+            });
+
+            document.getElementById('fetchData').addEventListener('click', () => {
+                const stateSelect = document.getElementById('stateSelect');
+                const countySelect = document.getElementById('countySelect');
+                const stateName = stateSelect.value;
+                const countyName = countySelect.value;
+
+                if (stateName && countyName) {
+                    fetchFemaData(stateName, countyName);
+                } else {
+                    alert('Please select both a state and a county.');
                 }
-				stateLayer.setMap(null);
             });
         }
 
-        function loadCounties(stateName,stateid) {
+        function populateStateDropdown(features) {
+            const stateSelect = document.getElementById('stateSelect');
+            features.forEach((feature) => {
+                const stateName = feature.getProperty('name');
+                const stateid = feature.Hg;
+                stateData[stateName] = stateid;
+
+                const option = document.createElement('option');
+                option.value = stateName;
+                option.textContent = stateName;
+                stateSelect.appendChild(option);
+            });
+        }
+
+        function loadCounties(stateName, stateid) {
             // Clear existing county data if present
             if (countyLayer) {
                 countyLayer.setMap(null);
@@ -156,7 +122,11 @@
 
             // Load GeoJSON for counties
             countyLayer.loadGeoJson(
-                'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+                'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json',
+                null,
+                function () {
+                    populateCountyDropdown(stateid);
+                }
             );
 
             // Filter counties by the selected state abbreviation
@@ -178,23 +148,36 @@
 
             // Add click listener for counties
             countyLayer.addListener('click', function (event) {
-
-				                const countyName = event.feature.getProperty('NAME');
-                alert(`You clicked on ${countyName} County`);
-				const countycode = event.feature.getProperty('COUNTY');
-
-				fetchFemaData(stateName, countyName,countycode);
+                const countyName = event.feature.getProperty('NAME'); // Replace 'NAME' with the correct property for county name
+                fetchFemaData(stateName, countyName);
             });
         }
-		
-		function fetchFemaData(stateName, countyName,countycode) {
+
+        function populateCountyDropdown(stateid) {
+            const countySelect = document.getElementById('countySelect');
+            countySelect.innerHTML = '<option value="" disabled selected>Select a County</option>';
+
+            countyLayer.forEach((feature) => {
+                const countyStateAbbr = feature.getProperty('STATE');
+                if (countyStateAbbr === stateid) {
+                    const countyName = feature.getProperty('NAME');
+                    countyData.push(countyName);
+
+                    const option = document.createElement('option');
+                    option.value = countyName;
+                    option.textContent = countyName;
+                    countySelect.appendChild(option);
+                }
+            });
+        }
+
+        function fetchFemaData(stateName, countyName) {
             // Replace spaces with '%20' for URL encoding
-			state=newobj[stateName];
-            const encodedState = encodeURIComponent(state);
-            const encodedCounty = encodeURIComponent(countycode);
+            const encodedState = encodeURIComponent(stateName);
+            const encodedCounty = encodeURIComponent(countyName);
 
             // FEMA API URL for incidents by state and county
-            const apiUrl = `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq '${encodedState}' and fipsCountyCode eq '${encodedCounty}'`;
+            const apiUrl = `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq '${encodedState}' and designatedArea eq '${encodedCounty}'`;
 
             // Fetch data from FEMA API
             fetch(apiUrl)
@@ -209,6 +192,28 @@
                     console.error('Error fetching FEMA data:', error);
                     alert('Failed to fetch FEMA data.');
                 });
+        }
+
+        function fitBoundsToFeature(geometry) {
+            const bounds = new google.maps.LatLngBounds();
+
+            if (geometry.getType() === 'Polygon') {
+                geometry.getArray().forEach(function (path) {
+                    path.getArray().forEach(function (latLng) {
+                        bounds.extend(latLng);
+                    });
+                });
+            } else if (geometry.getType() === 'MultiPolygon') {
+                geometry.getArray().forEach(function (polygon) {
+                    polygon.getArray().forEach(function (path) {
+                        path.getArray().forEach(function (latLng) {
+                            bounds.extend(latLng);
+                        });
+                    });
+                });
+            }
+
+            map.fitBounds(bounds); // Adjust the map to fit the feature's bounds
         }
 
         // Initialize the map
