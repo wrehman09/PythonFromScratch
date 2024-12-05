@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>States and Counties on Google Maps</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAHnxJaKR_J90atrYEGmdGCeHDS4qki2OM"></script>
+    <style>
+        #map {
+            height: 100vh; /* Full screen height */
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+	<script>
+	newobj={
+    "Alabama": "AL",
+    "Alaska": "AK",
+    "American Samoa": "AS",
+    "Arizona": "AZ",
+    "Arkansas": "AR",
+    "California": "CA",
+    "Colorado": "CO",
+    "Connecticut": "CT",
+    "Delaware": "DE",
+    "District Of Columbia": "DC",
+    "Federated States Of Micronesia": "FM",
+    "Florida": "FL",
+    "Georgia": "GA",
+    "Guam": "GU",
+    "Hawaii": "HI",
+    "Idaho": "ID",
+    "Illinois": "IL",
+    "Indiana": "IN",
+    "Iowa": "IA",
+    "Kansas": "KS",
+    "Kentucky": "KY",
+    "Louisiana": "LA",
+    "Maine": "ME",
+    "Marshall Islands": "MH",
+    "Maryland": "MD",
+    "Massachusetts": "MA",
+    "Michigan": "MI",
+    "Minnesota": "MN",
+    "Mississippi": "MS",
+    "Missouri": "MO",
+    "Montana": "MT",
+    "Nebraska": "NE",
+    "Nevada": "NV",
+    "New Hampshire": "NH",
+    "New Jersey": "NJ",
+    "New Mexico": "NM",
+    "New York": "NY",
+    "North Carolina": "NC",
+    "North Dakota": "ND",
+    "Northern Mariana Islands": "MP",
+    "Ohio": "OH",
+    "Oklahoma": "OK",
+    "Oregon": "OR",
+    "Palau": "PW",
+    "Pennsylvania": "PA",
+    "Puerto Rico": "PR",
+    "Rhode Island": "RI",
+    "South Carolina": "SC",
+    "South Dakota": "SD",
+    "Tennessee": "TN",
+    "Texas": "TX",
+    "Utah": "UT",
+    "Vermont": "VT",
+    "Virgin Islands": "VI",
+    "Virginia": "VA",
+    "Washington": "WA",
+    "West Virginia": "WV",
+    "Wisconsin": "WI",
+    "Wyoming": "WY"
+}
+	</script>
+	
+	
+	
+	
+	
+	
+    <script>
+        let map;
+        let stateLayer; // Data layer for states
+        let countyLayer; // Data layer for counties
+
+        function initMap() {
+            // Initialize the map centered on the United States
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 37.0902, lng: -95.7129 }, // Center of the USA
+                zoom: 4,
+            });
+
+            // Load the GeoJSON for states
+            stateLayer = new google.maps.Data();
+            stateLayer.loadGeoJson(
+                'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
+            );
+
+            // Style for states
+            stateLayer.setStyle({
+                fillColor: 'lightblue',
+                strokeColor: 'blue',
+                strokeWeight: 1,
+                fillOpacity: 0.6,
+            });
+
+            // Add states layer to map
+            stateLayer.setMap(map);
+
+            // Add click event listener for states
+            stateLayer.addListener('click', function (event) {
+                const stateid=event.feature.Hg;
+				const stateName = event.feature.getProperty('name');
+                alert(`You clicked on ${stateName}`);
+
+                // Load counties for the clicked state
+                loadCounties(stateName,stateid);
+
+                const geometry = event.feature.getGeometry();
+
+                // Change map center to the clicked county
+                if (geometry.getType() === 'Polygon') {
+                    const bounds = new google.maps.LatLngBounds();
+                    geometry.getArray().forEach(function (path) {
+                        path.getArray().forEach(function (latLng) {
+                            bounds.extend(latLng);
+                        });
+                    });
+                    map.fitBounds(bounds); // Adjust the map to fit the county's bounds
+                } else if (geometry.getType() === 'MultiPolygon') {
+                    const bounds = new google.maps.LatLngBounds();
+                    geometry.getArray().forEach(function (polygon) {
+                        polygon.getArray().forEach(function (path) {
+                            path.getArray().forEach(function (latLng) {
+                                bounds.extend(latLng);
+                            });
+                        });
+                    });
+                    map.fitBounds(bounds); // Adjust the map to fit the county's bounds
+                }
+				stateLayer.setMap(null);
+            });
+        }
+
+        function loadCounties(stateName,stateid) {
+            // Clear existing county data if present
+            if (countyLayer) {
+                countyLayer.setMap(null);
+            }
+
+            // Initialize a new data layer for counties
+            countyLayer = new google.maps.Data();
+
+            // Load GeoJSON for counties
+            countyLayer.loadGeoJson(
+                'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+            );
+
+            // Filter counties by the selected state abbreviation
+            countyLayer.setStyle(function (feature) {
+                const countyStateAbbr = feature.getProperty('STATE'); // Replace with the actual property in your county GeoJSON
+                if (countyStateAbbr === stateid) {
+                    return {
+                        fillColor: 'green',
+                        strokeColor: 'black',
+                        strokeWeight: 1,
+                        fillOpacity: 0.6,
+                    };
+                }
+                return { visible: false }; // Hide counties not in the selected state
+            });
+
+            // Add county layer to the map
+            countyLayer.setMap(map);
+
+            // Add click listener for counties
+            countyLayer.addListener('click', function (event) {
+
+				                const countyName = event.feature.getProperty('NAME');
+                alert(`You clicked on ${countyName} County`);
+				const countycode = event.feature.getProperty('COUNTY');
+
+				fetchFemaData(stateName, countyName,countycode);
+            });
+        }
+		
+		function fetchFemaData(stateName, countyName,countycode) {
+            // Replace spaces with '%20' for URL encoding
+			state=newobj[stateName];
+            const encodedState = encodeURIComponent(state);
+            const encodedCounty = encodeURIComponent(countycode);
+
+            // FEMA API URL for incidents by state and county
+            const apiUrl = `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq '${encodedState}' and fipsCountyCode eq '${encodedCounty}'`;
+
+            // Fetch data from FEMA API
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    // Display incident count and details
+                    const incidents = data.DisasterDeclarationsSummaries || [];
+                    const incidentCount = incidents.length;
+                    alert(`FEMA Incident Count for ${countyName}, ${stateName}: ${incidentCount}`);
+                })
+                .catch(error => {
+                    console.error('Error fetching FEMA data:', error);
+                    alert('Failed to fetch FEMA data.');
+                });
+        }
+
+        // Initialize the map
+        window.onload = initMap;
+    </script>
+</body>
+</html>
