@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>US Map with Counties and FEMA Data</title>
+  <script src="https://maps.googleapis.com/maps/api/js?key="></script>
+  <style>
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+    .tooltip {
+      background: white;
+      padding: 10px;
+      border: 1px solid black;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    let map;
+    const stateLayer = new google.maps.Data();
+    const countyLayer = new google.maps.Data();
+
+    async function initMap() {
+      // Initialize the map
+      map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 4,
+        center: { lat: 39.8283, lng: -98.5795 }, // Centered on the US
+        mapTypeId: "terrain",
+      });
+
+      // Load GeoJSON for states from a remote source
+      stateLayer.loadGeoJson("https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json");
+      stateLayer.setStyle({
+        fillColor: "#4285F4",
+        fillOpacity: 0.6,
+        strokeColor: "#FFFFFF",
+        strokeWeight: 1,
+      });
+      stateLayer.setMap(map);
+
+      // Add click listener to show counties for a state
+      stateLayer.addListener("click", async (event) => {
+        const stateAbbreviation = event.feature.getProperty("id"); // Assume 'id' is the state abbreviation
+        //const stateBounds = event.feature.getGeometry().getBounds();
+
+        // Fetch and load county data for the clicked state
+        await loadCountyData(stateAbbreviation);
+        countyLayer.setMap(map);
+        //map.fitBounds(stateBounds);
+      });
+
+      // Add tooltip for counties
+      countyLayer.addListener("mouseover", (event) => {
+        const countyName = event.feature.getProperty("name");
+        const femaCount = event.feature.getProperty("femaCount") || "Loading...";
+        const tooltipContent = `<div class="tooltip">
+          <strong>County:</strong> ${countyName}<br>
+          <strong>FEMA Disaster Count:</strong> ${femaCount}
+        </div>`;
+        showTooltip(event.latLng, tooltipContent);
+      });
+
+      countyLayer.addListener("mouseout", () => {
+        hideTooltip();
+      });
+    }
+
+    async function loadCountyData(stateAbbreviation) {
+      // Clear previous county data
+      countyLayer.forEach((feature) => countyLayer.remove(feature));
+
+      // Fetch GeoJSON for counties in the state from a public API
+      const geoJsonResponse = await fetch(`https://public.opendatasoft.com/api/records/1.0/search/?dataset=us-counties&q=${stateAbbreviation}`);
+      const geoJson = await geoJsonResponse.json();
+
+      // Fetch FEMA data for counties in the state
+      const femaData = await fetchFEMAData(stateAbbreviation);
+
+      // Process and merge FEMA data with county GeoJSON
+      geoJson.records.forEach((record) => {
+        const countyName = record.fields.name;
+        record.fields.femaCount = femaData[countyName] || 0;
+      });
+
+      // Add counties to the map with FEMA-based colors
+      countyLayer.addGeoJson(geoJson);
+      countyLayer.setStyle((feature) => ({
+        fillColor: getColorByFemaCount(feature.getProperty("femaCount")),
+        fillOpacity: 0.7,
+        strokeColor: "#FFFFFF",
+        strokeWeight: 1,
+      }));
+    }
+
+    async function fetchFEMAData(stateAbbreviation) {
+      // Fetch FEMA disaster data for the state
+      const response = await fetch(`https://www.fema.gov/api/open/v1/DisasterDeclarationsSummaries?state=${stateAbbreviation}`);
+      const data = await response.json();
+
+      // Process FEMA data to get disaster counts per county
+      const disasterCounts = {};
+      data.DisasterDeclarationsSummaries.forEach((entry) => {
+        const county = entry.designatedArea;
+        disasterCounts[county] = (disasterCounts[county] || 0) + 1;
+      });
+
+      return disasterCounts;
+    }
+
+    function getColorByFemaCount(count) {
+      // Return a color based on the FEMA disaster count
+      if (count > 50) return "#FF0000"; // Red for high disaster count
+      if (count > 20) return "#FFA500"; // Orange for medium disaster count
+      if (count > 0) return "#00FF00"; // Green for low disaster count
+      return "#808080"; // Gray for no data
+    }
+
+    function showTooltip(latLng, content) {
+      const tooltip = document.createElement("div");
+      tooltip.className = "tooltip";
+      tooltip.innerHTML = content;
+      tooltip.style.position = "absolute";
+      tooltip.style.left = `${latLng.x}px`;
+      tooltip.style.top = `${latLng.y}px`;
+      document.body.appendChild(tooltip);
+    }
+
+    function hideTooltip() {
+      const tooltips = document.getElementsByClassName("tooltip");
+      while (tooltips.length > 0) {
+        tooltips[0].parentNode.removeChild(tooltips[0]);
+      }
+    }
+
+    // Initialize the map
+    window.onload = initMap;
+  </script>
+</body>
+</html>
